@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Bodoni_Moda, JetBrains_Mono } from "next/font/google";
-import Script from "next/script";
-import { DesignSwitcher } from "@/components/design/design-switcher";
-import { DEFAULT_DESIGN_THEME, DESIGN_THEME_STORAGE_KEY } from "@/lib/design-themes";
+import { DEFAULT_DESIGN_THEME } from "@/lib/design-themes";
 import "./globals.css";
 
 const displayFont = Bodoni_Moda({
@@ -22,18 +20,6 @@ const monoFont = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
 });
-
-const themeInitScript = `
-  (() => {
-    try {
-      const savedTheme = localStorage.getItem("${DESIGN_THEME_STORAGE_KEY}");
-      const activeTheme = savedTheme || "${DEFAULT_DESIGN_THEME}";
-      document.documentElement.setAttribute("data-theme", activeTheme);
-    } catch {
-      document.documentElement.setAttribute("data-theme", "${DEFAULT_DESIGN_THEME}");
-    }
-  })();
-`;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://reviewforge.vercel.app"),
@@ -74,11 +60,7 @@ export default function RootLayout({
       <body
         className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} bg-[var(--bg)] text-[var(--ink)] antialiased`}
       >
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeInitScript}
-        </Script>
         {children}
-        <DesignSwitcher />
       </body>
     </html>
   );
