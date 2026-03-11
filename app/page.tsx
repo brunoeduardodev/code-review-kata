@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { LandingProposals } from "@/components/design/landing-proposals";
 
 export const metadata: Metadata = {
-  title: "Design Proposals | Midnight Review Lab",
+  title: "Midnight Review Lab | Code Review Katas",
   description:
-    "Test six dark-mode landing proposals for AI-era code review katas, including distinct interaction and positioning strategies.",
+    "Practice AI-era code review katas in the Midnight Review Lab with fast drills, scoring, and instant coaching.",
 };
 
 export default function Home() {
