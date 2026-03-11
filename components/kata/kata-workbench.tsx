@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { aiRiskLabel, getScenarioById, kataScenarios, KataScenario } from "@/lib/kata-data";
+import { getScenarioById, kataScenarios, KataScenario } from "@/lib/kata-data";
 import { useActiveDesignTheme } from "@/lib/design-runtime";
 import {
   evaluateReview,
@@ -44,6 +44,13 @@ function readProgress(): ProgressState {
   } catch {
     return defaultProgress;
   }
+}
+
+function getDailyScenarioId(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return kataScenarios[dayOfYear % kataScenarios.length].id;
 }
 
 function formatTime(seconds: number): string {
@@ -150,70 +157,12 @@ function HeaderBar({
   );
 }
 
-function ScenarioBank({
-  scenarioId,
-  completedIds,
-  completionRate,
-  onLoadScenario,
-}: {
-  scenarioId: string;
-  completedIds: string[];
-  completionRate: number;
-  onLoadScenario: (id: string) => void;
-}) {
-  return (
-    <aside className="panel h-fit">
-      <div className="flex items-center justify-between">
-        <h2 className="section-title text-lg">Scenario Bank</h2>
-        <span className="rounded-full border border-emerald-700/60 bg-emerald-950/30 px-2.5 py-1 text-xs font-semibold text-emerald-200">
-          {completionRate}%
-        </span>
-      </div>
-
-      <div className="mt-4 max-h-[66vh] space-y-2 overflow-y-auto pr-1">
-        {kataScenarios.map((item) => {
-          const isActive = item.id === scenarioId;
-          const isDone = completedIds.includes(item.id);
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onLoadScenario(item.id)}
-              className={`w-full rounded-2xl border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg)] ${
-                isActive
-                  ? "border-[var(--accent)] bg-[color:var(--accent)]/10"
-                  : "border-[var(--line)] bg-[color:var(--surface-2)] hover:border-[var(--accent)]/55"
-              }`}
-            >
-              <p className="wire-label">{difficultyLabel(item)}</p>
-              <p className="mt-1 text-sm font-semibold leading-snug text-[var(--ink)]">{item.title}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full border border-[var(--line)] px-2 py-1">{aiRiskLabel(item.aiRiskTag)}</span>
-                {isDone ? (
-                  <span className="rounded-full border border-emerald-700/60 bg-emerald-950/35 px-2 py-1 font-medium text-emerald-200">
-                    Complete
-                  </span>
-                ) : (
-                  <span className="rounded-full border border-amber-700/60 bg-amber-950/35 px-2 py-1 font-medium text-amber-200">
-                    Pending
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-
 function ScenarioInspector({ scenario, remainingSeconds }: { scenario: KataScenario; remainingSeconds: number }) {
   return (
     <article className="panel">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="eyebrow">Active Scenario</p>
+          <p className="eyebrow">Today&apos;s Challenge</p>
           <h2 className="section-title mt-2 text-2xl">{scenario.title}</h2>
           <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{scenario.summary}</p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -422,7 +371,7 @@ function FinalReport({
 
 function MidnightLayout(props: WorkbenchProps) {
   return (
-    <div className="mx-auto w-full max-w-[1260px] px-4 pb-14 pt-8 md:px-8">
+    <div className="mx-auto w-full max-w-[860px] px-4 pb-14 pt-8 md:px-8">
       <HeaderBar
         title="Midnight Review Lab / Practice Workspace"
         subtitle="Practice PR reviews in 5-minute rounds"
@@ -432,34 +381,25 @@ function MidnightLayout(props: WorkbenchProps) {
         levelProgress={props.levelProgress}
       />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[338px_minmax(0,1fr)]">
-        <ScenarioBank
-          scenarioId={props.scenario.id}
-          completedIds={props.progress.completedIds}
-          completionRate={props.completionRate}
-          onLoadScenario={props.onLoadScenario}
+      <section className="mt-6 space-y-6">
+        <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
+        <ReviewEditor
+          reviewText={props.reviewText}
+          setReviewText={props.setReviewText}
+          statusMessage={props.statusMessage}
+          onSubmit={props.onSubmit}
         />
-
-        <section className="space-y-6">
-          <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
-          <ReviewEditor
-            reviewText={props.reviewText}
-            setReviewText={props.setReviewText}
-            statusMessage={props.statusMessage}
-            onSubmit={props.onSubmit}
+        <CoachPanel hintPreview={props.hintPreview} scenario={props.scenario} />
+        {props.report ? (
+          <FinalReport
+            report={props.report}
+            scenario={props.scenario}
+            bestScore={props.bestScore}
+            nextScenarioId={props.nextScenarioId}
+            onLoadScenario={props.onLoadScenario}
           />
-          <CoachPanel hintPreview={props.hintPreview} scenario={props.scenario} />
-          {props.report ? (
-            <FinalReport
-              report={props.report}
-              scenario={props.scenario}
-              bestScore={props.bestScore}
-              nextScenarioId={props.nextScenarioId}
-              onLoadScenario={props.onLoadScenario}
-            />
-          ) : null}
-        </section>
-      </div>
+        ) : null}
+      </section>
     </div>
   );
 }
@@ -476,36 +416,27 @@ function ObsidianLayout(props: WorkbenchProps) {
         levelProgress={props.levelProgress}
       />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <ScenarioBank
-          scenarioId={props.scenario.id}
-          completedIds={props.progress.completedIds}
-          completionRate={props.completionRate}
-          onLoadScenario={props.onLoadScenario}
-        />
-
-        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-6">
-            <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
-            <ReviewEditor
-              reviewText={props.reviewText}
-              setReviewText={props.setReviewText}
-              statusMessage={props.statusMessage}
-              onSubmit={props.onSubmit}
-            />
-          </div>
-          <div className="space-y-6">
-            <article className="panel">
-              <p className="wire-label">Editorial Guidance</p>
-              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                Frame each finding as a short narrative: root cause, impact, and recommendation. Aim for a review that can
-                be read as a mini incident memo.
-              </p>
-            </article>
-            <CoachPanel hintPreview={props.hintPreview} scenario={props.scenario} />
-          </div>
-        </section>
-      </div>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-6">
+          <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
+          <ReviewEditor
+            reviewText={props.reviewText}
+            setReviewText={props.setReviewText}
+            statusMessage={props.statusMessage}
+            onSubmit={props.onSubmit}
+          />
+        </div>
+        <div className="space-y-6">
+          <article className="panel">
+            <p className="wire-label">Editorial Guidance</p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+              Frame each finding as a short narrative: root cause, impact, and recommendation. Aim for a review that can
+              be read as a mini incident memo.
+            </p>
+          </article>
+          <CoachPanel hintPreview={props.hintPreview} scenario={props.scenario} />
+        </div>
+      </section>
 
       {props.report ? (
         <div className="mt-6">
@@ -524,7 +455,7 @@ function ObsidianLayout(props: WorkbenchProps) {
 
 function CyanLayout(props: WorkbenchProps) {
   return (
-    <div className="mx-auto w-full max-w-[1360px] px-4 pb-14 pt-8 md:px-8">
+    <div className="mx-auto w-full max-w-[1260px] px-4 pb-14 pt-8 md:px-8">
       <HeaderBar
         title="Cyan Circuit / Review Operations Console"
         subtitle="Manage review rounds like a live ops board"
@@ -534,14 +465,7 @@ function CyanLayout(props: WorkbenchProps) {
         levelProgress={props.levelProgress}
       />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[310px_minmax(0,1fr)_360px]">
-        <ScenarioBank
-          scenarioId={props.scenario.id}
-          completedIds={props.progress.completedIds}
-          completionRate={props.completionRate}
-          onLoadScenario={props.onLoadScenario}
-        />
-
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-6">
           <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
           {props.report ? (
@@ -592,15 +516,8 @@ function CrimsonLayout(props: WorkbenchProps) {
         levelProgress={props.levelProgress}
       />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[330px_minmax(0,1fr)]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-6">
-          <ScenarioBank
-            scenarioId={props.scenario.id}
-            completedIds={props.progress.completedIds}
-            completionRate={props.completionRate}
-            onLoadScenario={props.onLoadScenario}
-          />
-
           <article className="panel">
             <p className="wire-label">Expected triage lanes</p>
             <div className="mt-4 space-y-2">
@@ -648,28 +565,16 @@ function ForestLayout(props: WorkbenchProps) {
       />
 
       <section className="mt-6 space-y-6">
-        <article className="panel">
-          <p className="wire-label">Step 1 / Select Scenario</p>
-          <div className="mt-4">
-            <ScenarioBank
-              scenarioId={props.scenario.id}
-              completedIds={props.progress.completedIds}
-              completionRate={props.completionRate}
-              onLoadScenario={props.onLoadScenario}
-            />
-          </div>
-        </article>
-
         <div className="grid gap-6 lg:grid-cols-2">
           <article className="panel">
-            <p className="wire-label">Step 2 / Observe Code</p>
+            <p className="wire-label">Step 1 / Observe Code</p>
             <div className="mt-4">
               <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
             </div>
           </article>
 
           <article className="panel">
-            <p className="wire-label">Step 3 / Coaching Cues</p>
+            <p className="wire-label">Step 2 / Coaching Cues</p>
             <div className="mt-4">
               <CoachPanel hintPreview={props.hintPreview} scenario={props.scenario} />
             </div>
@@ -677,7 +582,7 @@ function ForestLayout(props: WorkbenchProps) {
         </div>
 
         <article className="panel">
-          <p className="wire-label">Step 4 / Submit Review</p>
+          <p className="wire-label">Step 3 / Submit Review</p>
           <div className="mt-4">
             <ReviewEditor
               reviewText={props.reviewText}
@@ -690,7 +595,7 @@ function ForestLayout(props: WorkbenchProps) {
 
         {props.report ? (
           <article className="panel">
-            <p className="wire-label">Step 5 / Reflect and Iterate</p>
+            <p className="wire-label">Step 4 / Reflect and Iterate</p>
             <div className="mt-4">
               <FinalReport
                 report={props.report}
@@ -721,12 +626,6 @@ function PolarLayout(props: WorkbenchProps) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="space-y-6">
-          <ScenarioBank
-            scenarioId={props.scenario.id}
-            completedIds={props.progress.completedIds}
-            completionRate={props.completionRate}
-            onLoadScenario={props.onLoadScenario}
-          />
           <ScenarioInspector scenario={props.scenario} remainingSeconds={props.remainingSeconds} />
         </section>
 
@@ -787,11 +686,14 @@ function PolarLayout(props: WorkbenchProps) {
 export function KataWorkbench() {
   const activeTheme = useActiveDesignTheme();
 
-  const [selectedId, setSelectedId] = useState(kataScenarios[0].id);
+  const [selectedId, setSelectedId] = useState(() => getDailyScenarioId());
   const [reviewText, setReviewText] = useState("");
   const [report, setReport] = useState<ReviewReport | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [remainingSeconds, setRemainingSeconds] = useState(kataScenarios[0].timeboxMinutes * 60);
+  const [remainingSeconds, setRemainingSeconds] = useState(() => {
+    const daily = getScenarioById(getDailyScenarioId());
+    return daily.timeboxMinutes * 60;
+  });
   const [progress, setProgress] = useState<ProgressState>(() => readProgress());
 
   const scenario = useMemo(() => getScenarioById(selectedId), [selectedId]);
