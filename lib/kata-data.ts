@@ -479,3 +479,8 @@ export function getScenarioById(id: string): KataScenario {
 
   return scenario;
 }
+
+export function getDailyScenario(): KataScenario {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000);
+  return kataScenarios[dayOfYear % kataScenarios.length];
+}

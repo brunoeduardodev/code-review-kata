@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { SignInModal } from "@/components/sign-in-modal";
 import { getScenarioById, kataScenarios, KataScenario } from "@/lib/kata-data";
 import { useActiveDesignTheme } from "@/lib/design-runtime";
 import {
@@ -80,6 +81,11 @@ function severityTone(severity: "high" | "medium" | "low"): string {
   return "border-cyan-800/70 bg-cyan-950/35 text-cyan-200";
 }
 
+type StoredUser = {
+  name: string;
+  email?: string;
+};
+
 type WorkbenchProps = {
   scenario: KataScenario;
   progress: ProgressState;
@@ -94,6 +100,7 @@ type WorkbenchProps = {
   bestScore: number;
   hintPreview: ReturnType<typeof getLiveHintPreview>;
   nextScenarioId: string;
+  showBackLink: boolean;
   onLoadScenario: (id: string) => void;
   onSubmit: () => void;
 };
@@ -101,6 +108,7 @@ type WorkbenchProps = {
 function HeaderBar({
   title,
   subtitle,
+  showBackLink,
   level,
   totalXp,
   completionRate,
@@ -108,6 +116,7 @@ function HeaderBar({
 }: {
   title: string;
   subtitle: string;
+  showBackLink: boolean;
   level: number;
   totalXp: number;
   completionRate: number;
@@ -117,9 +126,11 @@ function HeaderBar({
     <div className="panel overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)]/70 pb-4">
         <p className="wire-label">{title}</p>
-        <Link href="/" className="btn-secondary">
-          Back To Landing
-        </Link>
+        {showBackLink ? (
+          <Link href="/" className="btn-secondary">
+            Back To Landing
+          </Link>
+        ) : null}
       </div>
 
       <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -375,6 +386,7 @@ function MidnightLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Midnight Review Lab / Practice Workspace"
         subtitle="Practice PR reviews in 5-minute rounds"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -410,6 +422,7 @@ function ObsidianLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Obsidian Ember / Editorial Review Desk"
         subtitle="Write reviews like postmortem-quality editorial notes"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -459,6 +472,7 @@ function CyanLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Cyan Circuit / Review Operations Console"
         subtitle="Manage review rounds like a live ops board"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -510,6 +524,7 @@ function CrimsonLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Crimson Audit / Triage Command"
         subtitle="Resolve critical findings first, then reduce residual risk"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -558,6 +573,7 @@ function ForestLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Forest Relay / Coaching Studio"
         subtitle="Improve through calm, repeatable review loops"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -618,6 +634,7 @@ function PolarLayout(props: WorkbenchProps) {
       <HeaderBar
         title="Polar Terminal / Analytical Workspace"
         subtitle="Run evidence-first reviews with measurable structure"
+        showBackLink={props.showBackLink}
         level={props.level}
         totalXp={props.progress.totalXp}
         completionRate={props.completionRate}
@@ -683,18 +700,33 @@ function PolarLayout(props: WorkbenchProps) {
   );
 }
 
-export function KataWorkbench() {
+export function KataWorkbench({ embedded = false }: { embedded?: boolean }) {
   const activeTheme = useActiveDesignTheme();
 
   const [selectedId, setSelectedId] = useState(() => getDailyScenarioId());
   const [reviewText, setReviewText] = useState("");
   const [report, setReport] = useState<ReviewReport | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const [user, setUser] = useState<StoredUser | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const raw = window.localStorage.getItem("reviewforge-user");
+      return raw ? (JSON.parse(raw) as StoredUser) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [pendingScenarioId, setPendingScenarioId] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(() => {
     const daily = getScenarioById(getDailyScenarioId());
     return daily.timeboxMinutes * 60;
   });
   const [progress, setProgress] = useState<ProgressState>(() => readProgress());
+  const dailyScenarioId = getDailyScenarioId();
 
   const scenario = useMemo(() => getScenarioById(selectedId), [selectedId]);
   const activeIndex = useMemo(
@@ -738,6 +770,41 @@ export function KataWorkbench() {
     setReviewText("");
     setReport(null);
     setStatusMessage("");
+  }
+
+  function handleScenarioChange(id: string) {
+    const needsSignIn = !user && id !== selectedId && id !== dailyScenarioId;
+
+    if (needsSignIn) {
+      setPendingScenarioId(id);
+      setSignInOpen(true);
+      setStatusMessage("Sign in to unlock follow-up PRs after today's daily review.");
+      return;
+    }
+
+    loadScenario(id);
+  }
+
+  function handleSignIn(name: string) {
+    const raw = window.localStorage.getItem("reviewforge-user");
+
+    if (raw) {
+      try {
+        setUser(JSON.parse(raw) as StoredUser);
+      } catch {
+        setUser({ name });
+      }
+    } else {
+      setUser({ name });
+    }
+
+    setSignInOpen(false);
+
+    if (pendingScenarioId) {
+      const nextId = pendingScenarioId;
+      setPendingScenarioId(null);
+      loadScenario(nextId);
+    }
   }
 
   function handleSubmit() {
@@ -787,15 +854,72 @@ export function KataWorkbench() {
     bestScore,
     hintPreview,
     nextScenarioId: nextScenario.id,
-    onLoadScenario: loadScenario,
+    showBackLink: !embedded,
+    onLoadScenario: handleScenarioChange,
     onSubmit: handleSubmit,
   };
 
-  if (activeTheme === "obsidian-ember") return <ObsidianLayout {...commonProps} />;
-  if (activeTheme === "cyan-circuit") return <CyanLayout {...commonProps} />;
-  if (activeTheme === "crimson-audit") return <CrimsonLayout {...commonProps} />;
-  if (activeTheme === "forest-relay") return <ForestLayout {...commonProps} />;
-  if (activeTheme === "polar-terminal") return <PolarLayout {...commonProps} />;
+  const followUpModal = (
+    <SignInModal
+      open={signInOpen}
+      onClose={() => setSignInOpen(false)}
+      onSignIn={handleSignIn}
+      eyebrow="Follow-up Queue"
+      title="Sign in to review follow-up PRs"
+      description="Today's daily PR stays open to everyone. Sign in when you want to continue into additional review rounds."
+      submitLabel="Unlock Follow-up PRs"
+    />
+  );
 
-  return <MidnightLayout {...commonProps} />;
+  if (activeTheme === "obsidian-ember") {
+    return (
+      <>
+        {followUpModal}
+        <ObsidianLayout {...commonProps} />
+      </>
+    );
+  }
+
+  if (activeTheme === "cyan-circuit") {
+    return (
+      <>
+        {followUpModal}
+        <CyanLayout {...commonProps} />
+      </>
+    );
+  }
+
+  if (activeTheme === "crimson-audit") {
+    return (
+      <>
+        {followUpModal}
+        <CrimsonLayout {...commonProps} />
+      </>
+    );
+  }
+
+  if (activeTheme === "forest-relay") {
+    return (
+      <>
+        {followUpModal}
+        <ForestLayout {...commonProps} />
+      </>
+    );
+  }
+
+  if (activeTheme === "polar-terminal") {
+    return (
+      <>
+        {followUpModal}
+        <PolarLayout {...commonProps} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {followUpModal}
+      <MidnightLayout {...commonProps} />
+    </>
+  );
 }
