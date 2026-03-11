@@ -1,28 +1,45 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Public_Sans, Space_Grotesk } from "next/font/google";
+import { Archivo, Bodoni_Moda, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
+import { DesignSwitcher } from "@/components/design/design-switcher";
+import { DEFAULT_DESIGN_THEME, DESIGN_THEME_STORAGE_KEY } from "@/lib/design-themes";
 import "./globals.css";
 
-const displayFont = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const displayFont = Bodoni_Moda({
+  variable: "--font-bodoni-moda",
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
 });
 
-const bodyFont = Public_Sans({
-  variable: "--font-public-sans",
+const bodyFont = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const monoFont = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
+const monoFont = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600"],
 });
+
+const themeInitScript = `
+  (() => {
+    try {
+      const savedTheme = localStorage.getItem("${DESIGN_THEME_STORAGE_KEY}");
+      const activeTheme = savedTheme || "${DEFAULT_DESIGN_THEME}";
+      document.documentElement.setAttribute("data-theme", activeTheme);
+    } catch {
+      document.documentElement.setAttribute("data-theme", "${DEFAULT_DESIGN_THEME}");
+    }
+  })();
+`;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://reviewforge.vercel.app"),
   title: {
-    default: "ReviewForge | AI-Era Code Review Katas",
-    template: "%s | ReviewForge",
+    default: "Midnight Review Lab | Code Review Katas",
+    template: "%s | Midnight Review Lab",
   },
   description:
     "Train software engineers to review AI-generated code with 5-minute pull-request katas, instant coaching, and score progression.",
@@ -34,7 +51,7 @@ export const metadata: Metadata = {
     "next.js",
   ],
   openGraph: {
-    title: "ReviewForge | AI-Era Code Review Katas",
+    title: "Midnight Review Lab | Code Review Katas",
     description:
       "Ship safer software by practicing realistic code reviews across correctness, security, performance, and testing.",
     type: "website",
@@ -42,7 +59,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ReviewForge",
+    title: "Midnight Review Lab",
     description: "5-minute code-review drills for AI-generated code quality.",
   },
 };
@@ -53,9 +70,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} bg-[var(--bg)] text-[var(--ink)] antialiased`}>
+    <html lang="en" data-theme={DEFAULT_DESIGN_THEME}>
+      <body
+        className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} bg-[var(--bg)] text-[var(--ink)] antialiased`}
+      >
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
         {children}
+        <DesignSwitcher />
       </body>
     </html>
   );
